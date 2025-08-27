@@ -10,12 +10,22 @@ auth_bp = Blueprint('auth_bp', __name__)
 @auth_bp.route('/signup', methods=['POST'])
 def signup():
     data = request.get_json()
-    if not data or not all(k in data for k in ['username', 'email', 'password']):
+    required_fields = ['firstName', 'lastName', 'phoneNumber', 'username', 'email', 'password', 'role']
+    if not data or not all(k in data for k in required_fields):
         return jsonify({'error': 'Missing required fields'}), 400
+        
     if User.query.filter((User.username == data['username']) | (User.email == data['email'])).first():
         return jsonify({'error': 'Username or email already exists'}), 409
+        
     try:
-        new_user = User(username=data['username'], email=data['email'], role=data.get('role', 'attendee'))
+        new_user = User(
+            first_name=data['firstName'],
+            last_name=data['lastName'],
+            phone_number=data['phoneNumber'],
+            username=data['username'], 
+            email=data['email'], 
+            role=data.get('role', 'attendee')
+        )
         new_user.set_password(data['password'])
         db.session.add(new_user)
         db.session.commit()
