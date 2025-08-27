@@ -27,7 +27,6 @@ def create_app():
     jwt.init_app(app)
     CORS(app)
 
-    # Import model and define blocklist loader here to avoid circular imports
     from .models.token_blocklist import TokenBlocklist
 
     @jwt.token_in_blocklist_loader
