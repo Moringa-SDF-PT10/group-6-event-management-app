@@ -2,7 +2,7 @@ from flask import Blueprint, jsonify, request
 from app.auth_decorators import role_required
 from flask_jwt_extended import get_jwt_identity
 from app.models.event import Event 
-from config import db
+from app import db
 
 event_bp = Blueprint('event_bp', __name__, url_prefix='/events')
 
