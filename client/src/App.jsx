@@ -1,13 +1,22 @@
 import { Routes, Route } from 'react-router-dom';
 import LandingPage from './pages/LandingPage';
-import AuthPage from './pages/AuthPage';
+import LoginPage from './pages/LoginPage';
+import DashboardPage from './pages/DashboardPage';
+import EventsPage from './pages/EventsPage';
+import ProtectedRoute from './components/auth/ProtectedRoute';
 
 function App() {
   return (
     <Routes>
+      {/* Public Routes */}
       <Route path="/" element={<LandingPage />} />
-      <Route path="/auth" element={<AuthPage />} /> {/* Add the auth route */}
-      {/* TODO: Add a protected route for the dashboard, e.g., /dashboard */}
+      <Route path="/login" element={<LoginPage />} />
+
+      {/* Protected Routes */}
+      <Route element={<ProtectedRoute />}>
+        <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/events" element={<EventsPage />} /> {/* Add the new route */}
+      </Route>
     </Routes>
   );
 }
