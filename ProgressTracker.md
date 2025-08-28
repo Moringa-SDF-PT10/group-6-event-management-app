@@ -72,4 +72,5 @@ To complete the organizer's workflow andf make sure the right components were be
 
 ### Note on Reusability
 
-Feel free to either use the components I've built as-is or design your own. The core business logic (like API calls in AuthContext) is separate from the UI components, so you can easily swap out the front-end pieces without breaking the functionality. My goal was to provide a fully working prototype, but I encourage you to adapt it as you see fit for your tasks.
+
+Feel free to either use the components I've built as-is or design your own. The core business logic (like API calls in AuthContext) is separate from the UI components, so you can easily swap out the front-end pieces without breaking the functionality. I wanted to provide a fully working prototype. Please feel free to adapt the mock UI pages as you see fit for your tasks.
