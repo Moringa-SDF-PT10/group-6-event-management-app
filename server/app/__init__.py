@@ -7,7 +7,9 @@ from sqlalchemy import MetaData
 from flask_jwt_extended import JWTManager
 from .config import Config
 
+# FIXED: Added the "ix" key for naming indexes
 metadata = MetaData(naming_convention={
+    "ix": "ix_%(column_0_label)s",
     "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
 })
 
@@ -17,9 +19,9 @@ migrate = Migrate()
 jwt = JWTManager()
 CORS(app=None)
 
-def create_app():
+def create_app(config_class=Config): 
     app = Flask(__name__)
-    app.config.from_object(Config)
+    app.config.from_object(config_class)
 
     db.init_app(app)
     bcrypt.init_app(app)

@@ -19,7 +19,6 @@ class Config:
     JSON_SORT_KEYS = False
     
     # use a secret key from .en file for session management and JWT
-    #I used python -c "import secrets; print(secrets.token_hex(16))" to generate a random key
     SECRET_KEY = os.environ.get('SECRET_KEY')
     JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY')
 
@@ -30,3 +29,11 @@ class Config:
     # Token blocklisting on logout
     JWT_BLACKLIST_ENABLED = True
     JWT_BLACKLIST_TOKEN_CHECKS = ['access', 'refresh']
+
+# Test configuration class 
+class TestConfig(Config):
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
+    WTF_CSRF_ENABLED = False
+    TESTING = True
+    SECRET_KEY = 'test-secret-key'
+    JWT_SECRET_KEY = 'test-jwt-secret-key'
