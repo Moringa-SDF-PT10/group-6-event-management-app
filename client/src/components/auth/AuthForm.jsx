@@ -2,7 +2,7 @@ import { useContext } from 'react';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import AuthContext from '../../context/AuthContext';
-import { User, Mail, Phone, Lock, FileText } from 'lucide-react'; // Import icons
+import { User, Mail, Phone, Lock, FileText } from 'lucide-react';
 
 // A small reusable component for our input fields
 const InputWithIcon = ({ icon, name, placeholder, type = 'text', formik }) => {
