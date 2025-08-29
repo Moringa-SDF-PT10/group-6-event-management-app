@@ -5,13 +5,22 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 
 const CreateEventModal = ({ isOpen, onClose }) => {
+  const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [eventDate, setEventDate] = useState(null);
   const [eventTime, setEventTime] = useState(null);
 
+  const [formData, setFormData] = useState({
+    name: "",
+    description: "",
+    price: "",
+    capacity: "",
+  });
+
   const handleFileChange = (event) => {
     const file = event.target.files[0];
     if (file && ["image/jpeg", "image/png", "image/jpg"].includes(file.type)) {
+      setImageFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result);
@@ -22,6 +31,45 @@ const CreateEventModal = ({ isOpen, onClose }) => {
       alert("Please upload a valid image file (JPG, PNG).");
     }
   };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    const { name, description, price, capacity } = formData;
+    const eventDateTime = new Date(eventDate);
+    if (eventTime) {
+      eventDateTime.setHours(eventTime.getHours());
+      eventDateTime.setMinutes(eventTime.getMinutes());
+    }
+
+    // Use FormData to send both text and file data
+    const dataToSend = new FormData();
+    dataToSend.append("name", name);
+    dataToSend.append("description", description);
+    dataToSend.append("date", eventDateTime.toISOString());
+    dataToSend.append("price", price);
+    dataToSend.append("capacity", capacity);
+    if (imageFile) {
+      dataToSend.append("banner_image", imageFile);
+    }
+    
+    // Get the auth token from localStorage
+    const token = localStorage.getItem("token");
+
+      const response = await fetch("http://your-api-url.com/api/events", {
+        method: "POST",
+        headers: {
+          "x-auth-token": token,
+        },
+        body: dataToSend,
+      });
+    }
+  
 
   if (!isOpen) return null;
 
@@ -96,6 +144,9 @@ const CreateEventModal = ({ isOpen, onClose }) => {
               <label className="font-semibold text-sm">Event Name</label>
               <input
                 type="text"
+                name="name"
+                value={formData.name}
+                onChange={handleInputChange}
                 placeholder="e.g., Nairobi Tech Summit"
                 className="w-full mt-1 p-3 bg-gray-100 border border-gray-200 rounded-md"
               />
@@ -105,6 +156,9 @@ const CreateEventModal = ({ isOpen, onClose }) => {
             <div>
               <label className="font-semibold text-sm">Event Description</label>
               <textarea
+                name="description"
+                value={formData.description}
+                onChange={handleInputChange}
                 placeholder="Tell us about your event..."
                 rows="3"
                 className="w-full mt-1 p-3 bg-gray-100 border border-gray-200 rounded-md"
@@ -162,6 +216,9 @@ const CreateEventModal = ({ isOpen, onClose }) => {
                 </label>
                 <input
                   type="number"
+                  name="price"
+                  value={formData.price}
+                  onChange={handleInputChange}
                   placeholder="e.g., 1500"
                   className="w-full mt-1 p-3 bg-gray-100 border border-gray-200 rounded-md"
                 />
@@ -170,6 +227,9 @@ const CreateEventModal = ({ isOpen, onClose }) => {
                 <label className="font-semibold text-sm">Capacity</label>
                 <input
                   type="number"
+                  name="capacity"
+                  value={formData.capacity}
+                  onChange={handleInputChange}
                   placeholder="e.g., 200"
                   className="w-full mt-1 p-3 bg-gray-100 border border-gray-200 rounded-md"
                 />
