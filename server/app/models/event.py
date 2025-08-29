@@ -72,7 +72,8 @@ class Event(db.Model):
     
     @property
     def is_upcoming(self):
-        #check when the event will be in terms of when 
+        #check when the event will be in terms of when the event will be
+        
         return self.date > datetime.now(timezone.utc) if self.date else False
     
     @property

@@ -111,7 +111,7 @@ def create_events(categories):
             'price': 4500.0,
             'image_url': 'https://littleimages.blob.core.windows.net/movieproviders/movies//65C7BF07-B682-48F0-9823-39031BF710FE',
             'max_attendees': 8000,
-            'slug': 'koroga-festival-2025',
+            'slug': 'ngemi-festival-2025',
             'categories': ['music-concerts', 'arts-culture']
         },
         {
@@ -255,7 +255,7 @@ def create_events(categories):
     return events
 
 def seed_database():
-    """Main seeding function."""
+    
     app = create_app('development')
     
     with app.app_context():
