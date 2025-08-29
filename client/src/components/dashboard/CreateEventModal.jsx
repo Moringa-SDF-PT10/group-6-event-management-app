@@ -61,14 +61,29 @@ const CreateEventModal = ({ isOpen, onClose }) => {
     // Get the auth token from localStorage
     const token = localStorage.getItem("token");
 
-      const response = await fetch("http://your-api-url.com/api/events", {
-        method: "POST",
-        headers: {
-          "x-auth-token": token,
-        },
-        body: dataToSend,
-      });
-    }
+    try {
+  const response = await fetch("http://your-api-url.com/api/events", {
+    method: "POST",
+    headers: {
+      "x-auth-token": token,
+    },
+    body: dataToSend,
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || "Failed to create event.");
+  }
+
+  const createdEvent = await response.json();
+  console.log("Event created successfully:", createdEvent);
+  onClose();
+
+} catch (error) {
+  console.error("Error creating event:", error);
+  alert(error.message);
+}
+  }
   
 
   if (!isOpen) return null;
