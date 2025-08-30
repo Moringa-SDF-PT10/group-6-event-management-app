@@ -2,6 +2,24 @@
 
 A full-stack event management and ticketing platform built with Flask (backend) and React (frontend). This system serves two primary user roles: **Attendees** who can browse and purchase event tickets, and **Organizers** who can create and manage events.
 
+## 🚀 Live Application  
+
+### 🔎 Preview  
+
+<p align="center">
+  <a href="https://group-6-event-management-app-tfpl.onrender.com/">
+    <img src="./client/public/Screenshot (53).png" alt="Homepage Preview" width="80%"/>
+  </a>
+</p>
+
+<p align="center">
+  <img src="./client/public/Screenshot (54).png" alt="Event Details Preview" width="80%"/>
+</p>
+
+<p align="center">
+  <img src="./client/public/Screenshot (55).png" alt="Dashboard Preview" width="80%"/>
+</p>
+
 ## 🌟 Features
 
 ### 👥 For Attendees
