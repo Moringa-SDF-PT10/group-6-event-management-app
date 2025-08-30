@@ -12,7 +12,8 @@ const TopPicksSlider = () => {
   useEffect(() => {
     const fetchTopPicks = async () => {
       try {
-        const response = await fetch('http://127.0.0.1:5000/api/events/top-picks');
+        // UPDATED: Changed to a relative path
+        const response = await fetch('/api/events/top-picks');
         const data = await response.json();
         if (response.ok) {
           setTopPicks(data);

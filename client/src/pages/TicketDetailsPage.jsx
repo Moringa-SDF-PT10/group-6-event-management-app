@@ -15,7 +15,8 @@ const TicketDetailsPage = () => {
         const fetchTicketDetails = async () => {
             if (!token || !ticketId) return;
             try {
-                const response = await fetch(`http://127.0.0.1:5000/api/users/attendee/tickets/${ticketId}`, {
+                // UPDATED: Changed to a relative path
+                const response = await fetch(`/api/users/attendee/tickets/${ticketId}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const data = await response.json();

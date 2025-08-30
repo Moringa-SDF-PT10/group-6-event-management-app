@@ -13,7 +13,8 @@ const EventsPage = () => {
     useEffect(() => {
         const fetchEvents = async () => {
             try {
-                const response = await fetch('http://127.0.0.1:5000/api/events');
+                // UPDATED: Changed to a relative path
+                const response = await fetch('/api/events');
                 if (!response.ok) {
                     throw new Error('Failed to fetch events');
                 }

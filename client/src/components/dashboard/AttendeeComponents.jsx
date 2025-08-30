@@ -12,7 +12,8 @@ export const AttendeeDashboardLayout = () => {
         const fetchMyTickets = async () => {
             if (!token) return;
             try {
-                const response = await fetch('http://127.0.0.1:5000/api/users/attendee/tickets', {
+                // UPDATED: Changed to a relative path
+                const response = await fetch('/api/users/attendee/tickets', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const data = await response.json();
@@ -94,4 +95,3 @@ export const FilterBar = () => (
         <button className="bg-coral text-white font-semibold py-2 px-4 rounded-md">Filter</button>
     </div>
 );
-

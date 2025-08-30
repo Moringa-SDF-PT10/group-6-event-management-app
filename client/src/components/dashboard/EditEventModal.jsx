@@ -42,7 +42,8 @@ const EditEventModal = ({ isOpen, onClose, event, onEventUpdated }) => {
             };
 
             try {
-                const response = await fetch(`http://127.0.0.1:5000/api/events/${event.id}`, {
+                // UPDATED: Changed to a relative path
+                const response = await fetch(`/api/events/${event.id}`, {
                     method: 'PATCH',
                     headers: {
                         'Content-Type': 'application/json',
@@ -159,4 +160,3 @@ const EditEventModal = ({ isOpen, onClose, event, onEventUpdated }) => {
 };
 
 export default EditEventModal;
-
