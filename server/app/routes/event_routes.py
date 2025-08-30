@@ -6,12 +6,34 @@ from app.auth_decorators import role_required
 from flask_jwt_extended import get_jwt_identity
 from sqlalchemy import or_
 from datetime import datetime
-import os, uuid
+import os
+import uuid
 from werkzeug.utils import secure_filename
 
-event_bp = Blueprint("events", __name__, url_prefix="/events")
+event_bp = Blueprint("events", __name__)
 
-# ---------- PUBLIC ROUTES ----------
+#PUBLIC ROUTES
+
+#Route for Top Picks section
+@event_bp.route("/top-picks", methods=["GET"])
+def get_top_picks():
+    """Fetches the top 4 most expensive upcoming events."""
+    events = Event.query.filter(
+        Event.is_active == True,
+        Event.date > datetime.utcnow()
+    ).order_by(Event.price.desc()).limit(4).all()
+    return jsonify([event.to_summary_dict() for event in events])
+
+#Route for Featured Events section
+@event_bp.route("/featured", methods=["GET"])
+def get_featured_events():
+    """Fetches the top 8 soonest upcoming events."""
+    events = Event.query.filter(
+        Event.is_active == True,
+        Event.date > datetime.utcnow()
+    ).order_by(Event.date.asc()).limit(8).all()
+    return jsonify([event.to_summary_dict() for event in events])
+
 
 @event_bp.route("/", methods=["GET"])
 def get_events():
@@ -89,38 +111,57 @@ def get_upcoming_events():
     ).order_by(Event.date.asc()).limit(limit).all()
     return jsonify([event.to_summary_dict() for event in events])
 
-# ---------- ORGANIZER CRUD ROUTES ----------
+#ORGANIZER CRUD ROUTES
 
 @event_bp.route("/", methods=["POST"])
 @role_required(["organizer"])
 def create_event():
-    banner_image_url = None
-    if "banner_image" in request.files:
-        file = request.files["banner_image"]
-        if file:
-            filename = secure_filename(f"{uuid.uuid4()}_{file.filename}")
-            filepath = os.path.join(current_app.config["UPLOAD_FOLDER"], filename)
-            file.save(filepath)
-            banner_image_url = f"/uploads/{filename}"
+    try:
         data = request.form.to_dict()
-    else:
-        data = request.get_json()
-        banner_image_url = data.get("banner_image_url")
+        organizer_id = get_jwt_identity()
 
-    organizer_id = get_jwt_identity()
-    new_event = Event.create({
-        "name": data.get("name"),
-        "description": data.get("description"),
-        "date": data.get("date"),
-        "price": data.get("price"),
-        "capacity": data.get("capacity"),
-        "banner_image_url": banner_image_url
-    }, organizer_id)
+        required_fields = ['title', 'description', 'date', 'price', 'max_attendees', 'location', 'venue']
+        if not all(field in data for field in required_fields):
+            return jsonify({"error": "Missing required fields"}), 400
 
-    return jsonify({
-        "message": "Event created successfully",
-        "event": new_event.to_dict()
-    }), 201
+        image_url_path = None
+        if "image_url" in request.files:
+            file = request.files["image_url"]
+            if file and file.filename:
+                upload_folder = current_app.config.get("UPLOAD_FOLDER")
+                if upload_folder:
+                    os.makedirs(upload_folder, exist_ok=True)
+                    filename = secure_filename(f"{uuid.uuid4()}_{file.filename}")
+                    filepath = os.path.join(upload_folder, filename)
+                    file.save(filepath)
+                    image_url_path = f"/uploads/{filename}"
+
+        new_event = Event(
+            title=data.get("title"),
+            description=data.get("description"),
+            short_description=data.get("description", "")[:150],
+            date=datetime.fromisoformat(data.get("date").replace("Z", "+00:00")),
+            price=float(data.get("price")),
+            max_attendees=int(data.get("max_attendees")),
+            location=data.get("location"),
+            venue=data.get("venue"),
+            image_url=image_url_path,
+            organizer_id=organizer_id,
+            slug=Event.create_slug(data.get("title"))
+        )
+        
+        db.session.add(new_event)
+        db.session.commit()
+
+        return jsonify({
+            "message": "Event created successfully",
+            "event": new_event.to_dict()
+        }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error creating event: {e}")
+        return jsonify({"error": "An internal error occurred."}), 500
 
 @event_bp.route("/<int:id>", methods=["PATCH"])
 @role_required(["organizer"])
@@ -128,25 +169,30 @@ def update_event(id):
     event = Event.query.get(id)
     if not event:
         return jsonify({"error": "Event not found"}), 404
-    if event.organizer_id != get_jwt_identity():
+    
+    organizer_id_from_token = get_jwt_identity()
+    if str(event.organizer_id) != str(organizer_id_from_token):
         return jsonify({"error": "Unauthorized"}), 403
 
-    if "banner_image" in request.files:
-        file = request.files["banner_image"]
-        if file:
-            filename = secure_filename(f"{uuid.uuid4()}_{file.filename}")
-            filepath = os.path.join(current_app.config["UPLOAD_FOLDER"], filename)
-            file.save(filepath)
-            event.banner_image_url = f"/uploads/{filename}"
-        data = request.form.to_dict()
-    else:
-        data = request.get_json()
-        if "banner_image_url" in data:
-            event.banner_image_url = data["banner_image_url"]
+    data = request.form.to_dict() if request.files else request.get_json()
+
+    if "image_url" in request.files:
+        file = request.files["image_url"]
+        if file and file.filename:
+            upload_folder = current_app.config.get("UPLOAD_FOLDER")
+            if upload_folder:
+                os.makedirs(upload_folder, exist_ok=True)
+                filename = secure_filename(f"{uuid.uuid4()}_{file.filename}")
+                filepath = os.path.join(upload_folder, filename)
+                file.save(filepath)
+                event.image_url = f"/uploads/{filename}"
 
     for key, value in data.items():
-        if hasattr(event, key) and key != "banner_image_url":
-            setattr(event, key, value)
+        if hasattr(event, key) and key not in ["image_url", "id", "slug", "organizer_id"]:
+            if key == 'date' and value:
+                event.date = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            else:
+                 setattr(event, key, value)
 
     db.session.commit()
     return jsonify({"message": "Event updated", "event": event.to_dict()})
@@ -157,9 +203,12 @@ def delete_event(id):
     event = Event.query.get(id)
     if not event:
         return jsonify({"error": "Event not found"}), 404
-    if event.organizer_id != get_jwt_identity():
+    
+    organizer_id_from_token = get_jwt_identity()
+    if str(event.organizer_id) != str(organizer_id_from_token):
         return jsonify({"error": "Unauthorized"}), 403
-
+        
     db.session.delete(event)
     db.session.commit()
     return jsonify({"message": "Event deleted"})
+

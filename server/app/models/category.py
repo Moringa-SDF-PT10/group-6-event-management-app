@@ -1,6 +1,6 @@
 from app import db
 from datetime import datetime, timezone
-from .associations import event_categories  # assuming associations defines the link table
+from .associations import event_categories
 
 class Category(db.Model):
     __tablename__ = 'categories'
@@ -12,22 +12,23 @@ class Category(db.Model):
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
-    # Back reference to events through association table
     events = db.relationship('Event', secondary='event_categories', back_populates='categories')
     
     def __repr__(self):
         return f'<Category {self.name}>'
     
-    def to_dict(self):
-        return {
+    def to_dict(self, include_events=True):
+        data = {
             'id': self.id,
             'name': self.name,
             'description': self.description,
             'slug': self.slug,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
-            'events': [event.id for event in self.events]  # or event.to_dict()
         }
+        if include_events:
+            data['events'] = [event.id for event in self.events]
+        return data
     
     @staticmethod
     def create_slug(name):

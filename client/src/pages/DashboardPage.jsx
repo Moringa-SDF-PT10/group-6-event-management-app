@@ -8,6 +8,11 @@ import { OrganizerDashboardLayout } from '../components/dashboard/OrganizerCompo
 const DashboardPage = () => {
     const { user } = useContext(AuthContext);
     const [isCreateModalOpen, setCreateModalOpen] = useState(false);
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
+    const handleEventCreated = () => {
+        setCreateModalOpen(false);
+        setRefreshTrigger(prev => prev + 1); 
+    };
 
     if (!user) {
         return <div className="min-h-screen bg-cream flex items-center justify-center">Loading...</div>;
@@ -17,14 +22,23 @@ const DashboardPage = () => {
 
     return (
         <div className="min-h-screen bg-gray-100 font-sans">
-            {/* The Create Event Modal, only available to organizers */}
-            {isOrganizer && <CreateEventModal isOpen={isCreateModalOpen} onClose={() => setCreateModalOpen(false)} />}
+            {/* The Create Event Modal with the onEventCreated prop */}
+            {isOrganizer && (
+                <CreateEventModal 
+                    isOpen={isCreateModalOpen} 
+                    onClose={() => setCreateModalOpen(false)} 
+                    onEventCreated={handleEventCreated} 
+                />
+            )}
             
             <DashboardHeader user={user} />
             
             <main className="p-6 container mx-auto">
                 {isOrganizer ? (
-                    <OrganizerDashboardLayout onCreateEvent={() => setCreateModalOpen(true)} />
+                    <OrganizerDashboardLayout 
+                        onCreateEvent={() => setCreateModalOpen(true)}
+                        refreshTrigger={refreshTrigger}
+                    />
                 ) : (
                     <AttendeeDashboardLayout />
                 )}

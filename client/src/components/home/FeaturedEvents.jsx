@@ -1,23 +1,45 @@
+import { useState, useEffect } from 'react';
 import EventCard from '../shared/EventCard';
 
-const featuredEvents = Array.from({ length: 8 }, (_, i) => ({
-  id: i + 1,
-  title: `Pastel Night Groove ${i + 1}`,
-  date: { day: `${10 + i}`, month: 'OCT' },
-  time: '8:00 PM',
-  location: 'Nairobi, Kenya',
-  image: `https://placehold.co/600x400/${['FF6F61', '6BFFB8', 'A491D3', 'FFD166'][i%4]}/2D2D2D?text=Event+${i+1}`
-}));
-
 const FeaturedEvents = () => {
+  const [featuredEvents, setFeaturedEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchFeaturedEvents = async () => {
+      try {
+        const response = await fetch('http://127.0.0.1:5000/api/events/featured');
+        const data = await response.json();
+        if (response.ok) {
+          setFeaturedEvents(data);
+        } else {
+          throw new Error(data.error || 'Failed to fetch featured events');
+        }
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchFeaturedEvents();
+  }, []);
+
   return (
     <section className="py-20 px-6 container mx-auto">
       <h2 className="text-4xl font-bold text-center mb-12 text-charcoal">Featured Events</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-        {featuredEvents.map(event => (
-          <EventCard key={event.id} event={event} />
-        ))}
-      </div>
+      
+      {loading && <p className="text-center">Loading events...</p>}
+      {error && <p className="text-center text-red-500">Error: {error}</p>}
+
+      {!loading && !error && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+          {featuredEvents.map(event => (
+            <EventCard key={event.id} event={event} />
+          ))}
+        </div>
+      )}
     </section>
   );
 };

@@ -1,7 +1,7 @@
 from app import create_app, db
 from app.models.event import Event
 from app.models.category import Category
-from app.models.user import User  # Added import for User model
+from app.models.user import User
 from datetime import datetime, timedelta
 import os
 
@@ -43,6 +43,7 @@ def create_users():
     db.session.commit()
     
     print(f"✅ Created {len(users)} users")
+    # Return the created users so we can reference them later
     return users
 
 def create_categories():
@@ -70,8 +71,9 @@ def create_categories():
     print(f"✅ Created {len(categories_data)} categories")
     return categories
 
-def create_events(categories):
-    """Seeds the database with events."""
+# --- This function now accepts an 'organizer' object ---
+def create_events(categories, organizer):
+    """Seeds the database with events and links them to an organizer."""
     print("🎪 Creating events...")
     
     events_data = [
@@ -103,22 +105,23 @@ def create_events(categories):
             'slug': 'safari-sevens-rugby-2025',
             'categories': ['sports-fitness', 'community-social']
         },
-        # ... (add the rest of the events data here for brevity)
     ]
     
     events = []
     for event_data in events_data:
         category_slugs = event_data.pop('categories', [])
-        event_categories = [categories[slug] for slug in category_slugs if slug in categories]
+        event_categories_obj = [categories[slug] for slug in category_slugs if slug in categories]
         
         event = Event(**event_data)
-        event.categories = event_categories
+        event.categories = event_categories_obj
+        # --- This is where the magic happens, just like your example ---
+        event.organizer = organizer
         
         db.session.add(event)
         events.append(event)
     
     db.session.commit()
-    print(f"✅ Created {len(events_data)} events")
+    print(f"✅ Created {len(events_data)} events and linked to organizer '{organizer.username}'")
     return events
 
 def seed_database():
@@ -128,13 +131,20 @@ def seed_database():
     with app.app_context():
         print("🌱 Starting database seeding...")
         
-        # Clear existing data
         clear_data()
         
-        # Create data in order
+        # --- Find the organizer user after creating them ---
         users = create_users()
+        organizer_user = next((user for user in users if user.role == 'organizer'), None)
+        
         categories = create_categories()
-        events = create_events(categories)
+
+        # --- Pass the organizer to the create_events function ---
+        if organizer_user:
+            events = create_events(categories, organizer_user)
+        else:
+            print("⚠️ Could not find an organizer user to link events to.")
+            events = []
         
         print(f"\n🎉 Seeding completed successfully!")
         print(f"📊 Summary:")

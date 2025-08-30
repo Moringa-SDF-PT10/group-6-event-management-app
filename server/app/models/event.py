@@ -1,8 +1,11 @@
 from datetime import datetime, timezone
 import re
+import uuid
+from flask import request
 from app import db
 from app.models.associations import event_categories
 from app.models.user import User
+from app.models.ticket import Ticket
 
 class Event(db.Model):
     __tablename__ = 'events'
@@ -26,15 +29,20 @@ class Event(db.Model):
                            onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships
-    categories = db.relationship('Category',
-                                 secondary=event_categories,
-                                 back_populates='events')
+    categories = db.relationship('Category', secondary=event_categories, back_populates='events')
     organizer_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     organizer = db.relationship('User', backref='events')
     tickets = db.relationship('Ticket', backref='event', cascade='all, delete-orphan')
 
     def __repr__(self):
         return f'<Event {self.title}>'
+        
+
+    def _get_full_image_url(self):
+        if self.image_url and self.image_url.startswith('/uploads/'):
+            return f'{request.host_url.rstrip("/")}{self.image_url}'
+        return self.image_url
+
 
     def to_dict(self, include_categories=True):
         data = {
@@ -48,7 +56,7 @@ class Event(db.Model):
             'venue': self.venue,
             'price': self.price,
             'currency': self.currency,
-            'image_url': self.image_url,
+            'image_url': self._get_full_image_url(), # Use the helper
             'is_active': self.is_active,
             'max_attendees': self.max_attendees,
             'slug': self.slug,
@@ -56,10 +64,8 @@ class Event(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
-
         if include_categories:
-            data['categories'] = [category.to_dict() for category in self.categories]
-
+            data['categories'] = [category.to_dict(include_events=False) for category in self.categories]
         return data
 
     def to_summary_dict(self):
@@ -71,7 +77,7 @@ class Event(db.Model):
             'location': self.location,
             'price': self.price,
             'currency': self.currency,
-            'image_url': self.image_url,
+            'image_url': self._get_full_image_url(),
             'slug': self.slug,
             'categories': [{'id': cat.id, 'name': cat.name, 'slug': cat.slug} for cat in self.categories]
         }
@@ -88,10 +94,14 @@ class Event(db.Model):
 
     @staticmethod
     def create_slug(title):
-        slug = title.lower()
-        slug = re.sub(r'[^\w\s-]', '', slug)
+        slug = re.sub(r'[^\w\s-]', '', title.lower()).strip()
         slug = re.sub(r'\s+', '-', slug)
-        return slug[:250]
+        
+        if Event.query.filter_by(slug=slug).first():
+            unique_id = uuid.uuid4().hex[:6]
+            return f"{slug}-{unique_id}"
+            
+        return slug
 
     @classmethod
     def search_by_title(cls, search_term):
@@ -101,3 +111,4 @@ class Event(db.Model):
     def filter_by_category(cls, category_name):
         from app.models.category import Category
         return cls.query.join(cls.categories).filter(Category.name.ilike(f'%{category_name}%'))
+
