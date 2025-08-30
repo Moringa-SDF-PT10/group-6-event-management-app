@@ -211,4 +211,3 @@ def delete_event(id):
     db.session.delete(event)
     db.session.commit()
     return jsonify({"message": "Event deleted"})
-

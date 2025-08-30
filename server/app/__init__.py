@@ -62,4 +62,3 @@ def create_app(config_name='default'):
         app.register_blueprint(ticket_bp, url_prefix="/api/tickets")
 
     return app
-

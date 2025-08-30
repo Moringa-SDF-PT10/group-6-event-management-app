@@ -1,3 +1,4 @@
+
 from datetime import datetime, timezone
 import re
 import uuid
@@ -111,4 +112,3 @@ class Event(db.Model):
     def filter_by_category(cls, category_name):
         from app.models.category import Category
         return cls.query.join(cls.categories).filter(Category.name.ilike(f'%{category_name}%'))
-
