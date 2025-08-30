@@ -4,10 +4,6 @@ from app import db
 from app.models.category import Category
 from app.models.event import Event
 from app.models.associations import event_categories
+from app.models.user import User
 
-#think of a way to ensure that 
-# a.all models are available when the package is imported
-#b. flask migrate auto-generation hence:
-
-__all__ = ['db', 'Category', 'Event', 'event_categories']
-
+__all__ = ['db', 'Category', 'Event', 'event_categories', 'User', 'Ticket']

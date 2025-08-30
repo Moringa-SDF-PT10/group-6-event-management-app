@@ -1,0 +1,1 @@
+// For testing purposes... I went with a CreateEventModal. A pop up to quickly create events rather than a single decicated page
