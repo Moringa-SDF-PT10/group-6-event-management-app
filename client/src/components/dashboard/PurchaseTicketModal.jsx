@@ -29,7 +29,7 @@ const PurchaseTicketModal = ({ isOpen, onClose, event }) => {
         setIsLoading(true);
         setError(null);
         try {
-            const response = await fetch('http://127.0.0.1:5000/api/tickets/', {
+            const response = await fetch('/api/tickets/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -132,5 +132,6 @@ const PurchaseTicketModal = ({ isOpen, onClose, event }) => {
         </AnimatePresence>
     );
 };
+
 
 export default PurchaseTicketModal;
