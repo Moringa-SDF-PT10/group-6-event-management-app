@@ -21,7 +21,7 @@ services:
         value: wsgi.py
 
 
-  - type: static_site
+  - type: web
     name: event-horizon-client
     rootDir: client
     buildCommand: "npm install && npm run build"
