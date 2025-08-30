@@ -1,9 +1,15 @@
+import os
+import sys
+from datetime import datetime, timedelta
+
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from app import create_app, db
 from app.models.event import Event
 from app.models.category import Category
 from app.models.user import User
-from datetime import datetime, timedelta
-import os
+
 
 def clear_data():
     """Drops all tables and recreates them."""
@@ -43,7 +49,6 @@ def create_users():
     db.session.commit()
     
     print(f"✅ Created {len(users)} users")
-    # Return the created users so we can reference them later
     return users
 
 def create_categories():
@@ -71,7 +76,7 @@ def create_categories():
     print(f"✅ Created {len(categories_data)} categories")
     return categories
 
-# --- This function now accepts an 'organizer' object ---
+
 def create_events(categories, organizer):
     """Seeds the database with events and links them to an organizer."""
     print("🎪 Creating events...")
@@ -114,7 +119,6 @@ def create_events(categories, organizer):
         
         event = Event(**event_data)
         event.categories = event_categories_obj
-        # --- This is where the magic happens, just like your example ---
         event.organizer = organizer
         
         db.session.add(event)
@@ -133,13 +137,13 @@ def seed_database():
         
         clear_data()
         
-        # --- Find the organizer user after creating them ---
+
         users = create_users()
         organizer_user = next((user for user in users if user.role == 'organizer'), None)
         
         categories = create_categories()
 
-        # --- Pass the organizer to the create_events function ---
+
         if organizer_user:
             events = create_events(categories, organizer_user)
         else:
