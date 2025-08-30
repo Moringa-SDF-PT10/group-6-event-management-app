@@ -4,7 +4,7 @@ services:
     name: event-horizon-db
     region: oregon
     plan: free
-    version: "14"
+    postgresMajorVersion: "14"
 
 
   - type: web
