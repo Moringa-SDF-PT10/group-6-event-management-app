@@ -37,9 +37,15 @@ def create_app(config_class=Config):
         token = db.session.query(TokenBlocklist.id).filter_by(jti=jti).scalar()
         return token is not None
 
+    # Register blueprints
     from .routes.auth_routes import auth_bp
     from .routes.user_routes import user_bp
+    from .routes.event_routes import event_bp
+    from .routes.category_routes import category_bp
+    
     app.register_blueprint(auth_bp)
     app.register_blueprint(user_bp)
+    app.register_blueprint(event_bp)
+    app.register_blueprint(category_bp)
 
     return app

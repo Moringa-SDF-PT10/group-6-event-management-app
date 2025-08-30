@@ -1,26 +1,51 @@
+from sqlalchemy.orm import validates
+from sqlalchemy_serializer import SerializerMixin
+from app import db
 from datetime import datetime
-from .associations import db
 
-class Event(db.Model):
+class Event(db.Model, SerializerMixin):
     __tablename__ = 'events'
     
+    # Define serialization rules to include relationships
+    serialize_rules = ('-organizer.password_hash', '-tickets.user.password_hash', '-categories.events')
+
     id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(200), nullable=False)
+    title = db.Column(db.String(255), nullable=False)
     description = db.Column(db.Text, nullable=False)
     date = db.Column(db.DateTime, nullable=False)
-    location = db.Column(db.String(200), nullable=False)
+    location = db.Column(db.String(255), nullable=False)
     price = db.Column(db.Float, nullable=False)
     image_url = db.Column(db.String(500), nullable=True)
     organizer_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+
     # Relationships
+    organizer = db.relationship('User', backref=db.backref('events', lazy=True))
+    tickets = db.relationship('Ticket', backref='event', lazy=True, cascade='all, delete-orphan')
     categories = db.relationship('Category', secondary='event_categories', back_populates='events')
-    organizer = db.relationship('User', backref='events')
-    tickets = db.relationship('Ticket', backref='event', cascade='all, delete-orphan')
-    
-    def to_dict(self, include_categories=True):
-        event_dict = {
+
+    @validates('price')
+    def validate_price(self, key, value):
+        if value < 0:
+            raise ValueError("Price cannot be negative")
+        return value
+
+    @validates('date')
+    def validate_date(self, key, value):
+        if isinstance(value, str):
+            # If string is passed, try to parse it
+            try:
+                value = datetime.fromisoformat(value.replace('Z', '+00:00'))
+            except ValueError:
+                raise ValueError("Invalid date format. Use ISO format.")
+        
+        if value < datetime.now():
+            raise ValueError("Event date cannot be in the past")
+        return value
+
+    def to_dict(self, include_organizer=True, include_categories=True):
+        
+        data = {
             'id': self.id,
             'title': self.title,
             'description': self.description,
@@ -32,20 +57,15 @@ class Event(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
         
+        if include_organizer and self.organizer:
+            data['organizer'] = {
+                'id': self.organizer.id,
+                'username': self.organizer.username,
+                'first_name': self.organizer.first_name,
+                'last_name': self.organizer.last_name
+            }
+        
         if include_categories:
-            event_dict['categories'] = [category.to_dict() for category in self.categories]
+            data['categories'] = [{'id': cat.id, 'name': cat.name} for cat in self.categories]
             
-        return event_dict
-    
-    @classmethod
-    def search_by_title(cls, search_term):
-        #Search events by title (case insensitive)
-        return cls.query.filter(cls.title.ilike(f'%{search_term}%'))
-    
-    @classmethod
-    def filter_by_category(cls, category_name):
-       #Filter events by category name
-        return cls.query.join(cls.categories).filter(Category.name.ilike(f'%{category_name}%'))
-    
-    def __repr__(self):
-        return f'<Event {self.title}>'
+        return data

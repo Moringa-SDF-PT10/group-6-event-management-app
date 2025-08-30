@@ -1,6 +1,4 @@
-from flask_sqlalchemy import SQLAlchemy
-
-db = SQLAlchemy()
+from app import db
 
 # Many-to-many association table for events and categories
 event_categories = db.Table('event_categories',

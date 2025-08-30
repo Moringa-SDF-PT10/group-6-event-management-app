@@ -1,7 +1,8 @@
 from .user import User
-from .associations import db
 from .event import Event
 from .category import Category
 from .ticket import Ticket
+from .associations import event_categories
+from .token_blocklist import TokenBlocklist
 
-__all__ = ['db', 'User', 'Event', 'Category', 'Ticket']
+__all__ = ['User', 'Event', 'Category', 'Ticket', 'event_categories', 'TokenBlocklist']
