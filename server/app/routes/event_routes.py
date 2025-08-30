@@ -1,200 +1,213 @@
-from flask import Blueprint, request, jsonify
-from sqlalchemy import or_
+from flask import Blueprint, jsonify, request, current_app
 from app import db
-from app.models import Event, Category
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from app.models.event import Event
+from app.models.category import Category
+from app.auth_decorators import role_required
+from flask_jwt_extended import get_jwt_identity
+from sqlalchemy import or_
+from datetime import datetime
+import os
+import uuid
+from werkzeug.utils import secure_filename
 
-event_bp = Blueprint('events', __name__, url_prefix='/api/events')
+event_bp = Blueprint("events", __name__)
 
-@event_bp.route('', methods=['GET'])
+#PUBLIC ROUTES
+
+#Route for Top Picks section
+@event_bp.route("/top-picks", methods=["GET"])
+def get_top_picks():
+    """Fetches the top 4 most expensive upcoming events."""
+    events = Event.query.filter(
+        Event.is_active == True,
+        Event.date > datetime.utcnow()
+    ).order_by(Event.price.desc()).limit(4).all()
+    return jsonify([event.to_summary_dict() for event in events])
+
+#Route for Featured Events section
+@event_bp.route("/featured", methods=["GET"])
+def get_featured_events():
+    """Fetches the top 8 soonest upcoming events."""
+    events = Event.query.filter(
+        Event.is_active == True,
+        Event.date > datetime.utcnow()
+    ).order_by(Event.date.asc()).limit(8).all()
+    return jsonify([event.to_summary_dict() for event in events])
+
+
+@event_bp.route("/", methods=["GET"])
 def get_events():
-    #Get all events with optional search and filtering
-    try:
-        # Get query parameters
-        search = request.args.get('search', '').strip()
-        category = request.args.get('category', '').strip()
-        page = request.args.get('page', 1, type=int)
-        per_page = min(request.args.get('per_page', 10, type=int), 100)  # Max 100 per page
+    """Browse/filter/search/paginate events"""
+    query = Event.query.filter_by(is_active=True)
 
-        # Start with base query
-        query = Event.query
+    search_term = request.args.get("search", "").strip()
+    if search_term:
+        query = query.filter(or_(
+            Event.title.ilike(f"%{search_term}%"),
+            Event.description.ilike(f"%{search_term}%"),
+            Event.short_description.ilike(f"%{search_term}%")
+        ))
 
-        # Apply search filter (search in title and description)
-        if search:
-            search_term = f"%{search}%"
-            query = query.filter(
-                or_(
-                    Event.title.ilike(search_term),
-                    Event.description.ilike(search_term)
-                )
-            )
+    category_param = request.args.get("category", "").strip()
+    if category_param:
+        query = query.join(Event.categories).filter(or_(
+            Category.name.ilike(f"%{category_param}%"),
+            Category.slug.ilike(f"%{category_param}%")
+        ))
 
-        # Apply category filter
-        if category:
-            query = query.join(Event.categories).filter(Category.name.ilike(f"%{category}%"))
+    location = request.args.get("location", "").strip()
+    if location:
+        query = query.filter(Event.location.ilike(f"%{location}%"))
 
-        # Order by date (upcoming events first)
+    upcoming = request.args.get("upcoming", "").lower()
+    if upcoming == "true":
+        query = query.filter(Event.date > datetime.utcnow())
+
+    sort_by = request.args.get("sort", "date")
+    if sort_by == "price":
+        query = query.order_by(Event.price.asc())
+    elif sort_by == "title":
+        query = query.order_by(Event.title.asc())
+    else:
         query = query.order_by(Event.date.asc())
 
-        # Paginate results
-        paginated_events = query.paginate(
-            page=page,
-            per_page=per_page,
-            error_out=False
-        )
+    page = int(request.args.get("page", 1))
+    limit = min(int(request.args.get("limit", 20)), 100)
+    events_paginated = query.paginate(page=page, per_page=limit, error_out=False)
 
-        # Serialize events
-        events_data = []
-        for event in paginated_events.items:
-            events_data.append(event.to_dict())
+    return jsonify({
+        "success": True,
+        "events": [event.to_summary_dict() for event in events_paginated.items],
+        "pagination": {
+            "current_page": page,
+            "total_pages": events_paginated.pages,
+            "total_items": events_paginated.total,
+            "items_per_page": limit,
+            "has_next": events_paginated.has_next,
+            "has_prev": events_paginated.has_prev,
+        }
+    })
 
-        return jsonify({
-            'events': events_data,
-            'pagination': {
-                'page': page,
-                'pages': paginated_events.pages,
-                'per_page': per_page,
-                'total': paginated_events.total,
-                'has_next': paginated_events.has_next,
-                'has_prev': paginated_events.has_prev
-            }
-        }), 200
+@event_bp.route("/<int:event_id>", methods=["GET"])
+def get_event_by_id(event_id):
+    event = Event.query.filter_by(id=event_id, is_active=True).first()
+    if not event:
+        return jsonify({"error": "Event not found"}), 404
+    return jsonify(event.to_dict(include_categories=True))
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+@event_bp.route("/slug/<string:event_slug>", methods=["GET"])
+def get_event_by_slug(event_slug):
+    event = Event.query.filter_by(slug=event_slug, is_active=True).first()
+    if not event:
+        return jsonify({"error": "Event not found"}), 404
+    return jsonify(event.to_dict(include_categories=True))
 
+@event_bp.route("/upcoming", methods=["GET"])
+def get_upcoming_events():
+    limit = min(int(request.args.get("limit", 10)), 50)
+    events = Event.query.filter(
+        Event.is_active == True,
+        Event.date > datetime.utcnow()
+    ).order_by(Event.date.asc()).limit(limit).all()
+    return jsonify([event.to_summary_dict() for event in events])
 
-@event_bp.route('/<int:event_id>', methods=['GET'])
-def get_event(event_id):
-    #Get a single event by ID
-    try:
-        event = Event.query.get_or_404(event_id)
-        return jsonify({
-            'event': event.to_dict(include_organizer=True, include_categories=True)
-        }), 200
+#ORGANIZER CRUD ROUTES
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@event_bp.route('', methods=['POST'])
-@jwt_required()
+@event_bp.route("/", methods=["POST"])
+@role_required(["organizer"])
 def create_event():
-    #Create a new event (organizers only)
     try:
-        current_user_id = get_jwt_identity()
-        
-        # Get current user to check role
-        from app.models import User
-        current_user = User.query.get(current_user_id)
-        if not current_user or current_user.role != 'organizer':
-            return jsonify({'error': 'Only organizers can create events'}), 403
+        data = request.form.to_dict()
+        organizer_id = get_jwt_identity()
 
-        data = request.get_json()
-        
-        # Validate required fields
-        required_fields = ['title', 'description', 'date', 'location', 'price']
-        for field in required_fields:
-            if not data.get(field):
-                return jsonify({'error': f'{field} is required'}), 400
+        required_fields = ['title', 'description', 'date', 'price', 'max_attendees', 'location', 'venue']
+        if not all(field in data for field in required_fields):
+            return jsonify({"error": "Missing required fields"}), 400
 
-        # Create new event
-        event = Event(
-            title=data['title'],
-            description=data['description'],
-            date=data['date'],
-            location=data['location'],
-            price=float(data['price']),
-            image_url=data.get('image_url'),
-            organizer_id=current_user_id
+        image_url_path = None
+        if "image_url" in request.files:
+            file = request.files["image_url"]
+            if file and file.filename:
+                upload_folder = current_app.config.get("UPLOAD_FOLDER")
+                if upload_folder:
+                    os.makedirs(upload_folder, exist_ok=True)
+                    filename = secure_filename(f"{uuid.uuid4()}_{file.filename}")
+                    filepath = os.path.join(upload_folder, filename)
+                    file.save(filepath)
+                    image_url_path = f"/uploads/{filename}"
+
+        new_event = Event(
+            title=data.get("title"),
+            description=data.get("description"),
+            short_description=data.get("description", "")[:150],
+            date=datetime.fromisoformat(data.get("date").replace("Z", "+00:00")),
+            price=float(data.get("price")),
+            max_attendees=int(data.get("max_attendees")),
+            location=data.get("location"),
+            venue=data.get("venue"),
+            image_url=image_url_path,
+            organizer_id=organizer_id,
+            slug=Event.create_slug(data.get("title"))
         )
-
-        # Add categories if provided
-        if 'category_ids' in data:
-            categories = Category.query.filter(Category.id.in_(data['category_ids'])).all()
-            event.categories = categories
-
-        db.session.add(event)
+        
+        db.session.add(new_event)
         db.session.commit()
 
         return jsonify({
-            'message': 'Event created successfully',
-            'event': event.to_dict()
+            "message": "Event created successfully",
+            "event": new_event.to_dict()
         }), 201
 
-    except ValueError as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 400
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        print(f"Error creating event: {e}")
+        return jsonify({"error": "An internal error occurred."}), 500
 
+@event_bp.route("/<int:id>", methods=["PATCH"])
+@role_required(["organizer"])
+def update_event(id):
+    event = Event.query.get(id)
+    if not event:
+        return jsonify({"error": "Event not found"}), 404
+    
+    organizer_id_from_token = get_jwt_identity()
+    if str(event.organizer_id) != str(organizer_id_from_token):
+        return jsonify({"error": "Unauthorized"}), 403
 
-@event_bp.route('/<int:event_id>', methods=['PUT'])
-@jwt_required()
-def update_event(event_id):
-    #Update an event (only by its organizer)
-    try:
-        current_user_id = get_jwt_identity()
-        event = Event.query.get_or_404(event_id)
+    data = request.form.to_dict() if request.files else request.get_json()
 
-        # Check if current user is the organizer
-        if event.organizer_id != current_user_id:
-            return jsonify({'error': 'You can only update your own events'}), 403
+    if "image_url" in request.files:
+        file = request.files["image_url"]
+        if file and file.filename:
+            upload_folder = current_app.config.get("UPLOAD_FOLDER")
+            if upload_folder:
+                os.makedirs(upload_folder, exist_ok=True)
+                filename = secure_filename(f"{uuid.uuid4()}_{file.filename}")
+                filepath = os.path.join(upload_folder, filename)
+                file.save(filepath)
+                event.image_url = f"/uploads/{filename}"
 
-        data = request.get_json()
+    for key, value in data.items():
+        if hasattr(event, key) and key not in ["image_url", "id", "slug", "organizer_id"]:
+            if key == 'date' and value:
+                event.date = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            else:
+                 setattr(event, key, value)
 
-        # Update fields if provided
-        if 'title' in data:
-            event.title = data['title']
-        if 'description' in data:
-            event.description = data['description']
-        if 'date' in data:
-            event.date = data['date']
-        if 'location' in data:
-            event.location = data['location']
-        if 'price' in data:
-            event.price = float(data['price'])
-        if 'image_url' in data:
-            event.image_url = data['image_url']
+    db.session.commit()
+    return jsonify({"message": "Event updated", "event": event.to_dict()})
 
-        # Update categories if provided
-        if 'category_ids' in data:
-            categories = Category.query.filter(Category.id.in_(data['category_ids'])).all()
-            event.categories = categories
-
-        db.session.commit()
-
-        return jsonify({
-            'message': 'Event updated successfully',
-            'event': event.to_dict()
-        }), 200
-
-    except ValueError as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 400
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
-
-
-@event_bp.route('/<int:event_id>', methods=['DELETE'])
-@jwt_required()
-def delete_event(event_id):
-    #Delete an event (only by its organizer
-    try:
-        current_user_id = get_jwt_identity()
-        event = Event.query.get_or_404(event_id)
-
-        # Check if current user is the organizer
-        if event.organizer_id != current_user_id:
-            return jsonify({'error': 'You can only delete your own events'}), 403
-
-        db.session.delete(event)
-        db.session.commit()
-
-        return jsonify({'message': 'Event deleted successfully'}), 200
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+@event_bp.route("/<int:id>", methods=["DELETE"])
+@role_required(["organizer"])
+def delete_event(id):
+    event = Event.query.get(id)
+    if not event:
+        return jsonify({"error": "Event not found"}), 404
+    
+    organizer_id_from_token = get_jwt_identity()
+    if str(event.organizer_id) != str(organizer_id_from_token):
+        return jsonify({"error": "Unauthorized"}), 403
+        
+    db.session.delete(event)
+    db.session.commit()
+    return jsonify({"message": "Event deleted"})

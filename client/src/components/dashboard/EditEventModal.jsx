@@ -1,44 +1,81 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useContext } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import { X, Calendar, Clock } from 'lucide-react';
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+import AuthContext from '../../context/AuthContext';
 
-const EditEventModal = ({ isOpen, onClose, event }) => {
+const EditEventModal = ({ isOpen, onClose, event, onEventUpdated }) => {
+    const { token } = useContext(AuthContext);
+    // State for the DatePicker component
+    const [eventDate, setEventDate] = useState(null);
+    const [eventTime, setEventTime] = useState(null);
+
     const formik = useFormik({
         initialValues: {
-            eventName: '',
+            title: '',
             description: '',
-            date: '',
-            time: '',
+            location: '',
+            venue: '',
             price: '',
-            capacity: ''
+            max_attendees: ''
         },
         validationSchema: Yup.object({
-            eventName: Yup.string().required('Event name is required'),
-            date: Yup.date().required('Date is required').min(new Date(), 'Date must be in the future'),
+            title: Yup.string().required('Event name is required'),
             price: Yup.number().positive('Price must be a positive number').required('Price is required'),
-            capacity: Yup.number().integer('Capacity must be a whole number').positive('Capacity must be positive').required('Capacity is required'),
+            max_attendees: Yup.number().integer('Capacity must be a whole number').positive('Capacity must be positive').required('Capacity is required'),
         }),
-        onSubmit: (values) => {
-            alert('Submitting updated event data (see console)');
-            console.log({ eventId: event.id, ...values });
-            onClose();
+        onSubmit: async (values) => {
+            if (!eventDate || !eventTime) {
+                alert("Please select a valid date and time.");
+                return;
+            }
+            const combinedDateTime = new Date(eventDate);
+            combinedDateTime.setHours(eventTime.getHours());
+            combinedDateTime.setMinutes(eventTime.getMinutes());
+
+            const updatedData = {
+                ...values,
+                date: combinedDateTime.toISOString(),
+            };
+
+            try {
+                const response = await fetch(`http://127.0.0.1:5000/api/events/${event.id}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(updatedData),
+                });
+                if (!response.ok) throw new Error('Failed to update event');
+                onEventUpdated(); // Re-fetches the events list in the dashboard
+                onClose();
+            } catch (error) {
+                alert(error.message);
+            }
         },
-        enableReinitialize: true, // This is important to update the form when the event prop changes
+        enableReinitialize: true,
     });
 
     // This effect pre-populates the form when the modal opens with a selected event
     useEffect(() => {
         if (event) {
             formik.setValues({
-                eventName: event.title || '',
+                title: event.title || '',
                 description: event.description || '',
-                date: event.date || '',
-                time: event.time || '',
+                location: event.location || '',
+                venue: event.venue || '',
                 price: event.price || '',
-                capacity: event.capacity || '',
+                max_attendees: event.max_attendees || '',
             });
+            if (event.date) {
+                const dateObj = new Date(event.date);
+                setEventDate(dateObj);
+                setEventTime(dateObj);
+            }
         }
     }, [event]);
 
@@ -50,10 +87,7 @@ const EditEventModal = ({ isOpen, onClose, event }) => {
 
     return (
         <AnimatePresence>
-            <motion.div
-                className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm"
-                onClick={onClose}
-            >
+            <motion.div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm" onClick={onClose}>
                 <motion.div
                     initial={{ scale: 0.9, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
@@ -65,40 +99,52 @@ const EditEventModal = ({ isOpen, onClose, event }) => {
                         <h2 className="text-2xl font-bold text-charcoal">Edit Event: {event?.title}</h2>
                         <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100"><X size={20} /></button>
                     </div>
-                    {/* UPDATED: The full form is now here */}
                     <form onSubmit={formik.handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
                         <div>
-                            <label className="font-semibold text-sm">Event Name</label>
-                            <input name="eventName" {...formik.getFieldProps('eventName')} placeholder="e.g., Nairobi Tech Summit" className="w-full mt-1 p-3 bg-gray-100 border border-gray-200 rounded-md" />
-                            {renderError('eventName')}
+                            <label className="font-semibold text-sm">Event Title</label>
+                            <input name="title" {...formik.getFieldProps('title')} className="w-full mt-1 p-3 bg-gray-100 border border-gray-200 rounded-md" />
+                            {renderError('title')}
                         </div>
                         <div>
                             <label className="font-semibold text-sm">Event Description</label>
-                            <textarea name="description" {...formik.getFieldProps('description')} placeholder="Tell us about your event..." rows="3" className="w-full mt-1 p-3 bg-gray-100 border border-gray-200 rounded-md"></textarea>
+                            <textarea name="description" {...formik.getFieldProps('description')} rows="3" className="w-full mt-1 p-3 bg-gray-100 border border-gray-200 rounded-md"></textarea>
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="relative">
-                                <label className="font-semibold text-sm">Date</label>
-                                <Calendar size={18} className="absolute left-3 top-10 text-gray-400 pointer-events-none" />
-                                <input name="date" type="date" {...formik.getFieldProps('date')} className="w-full mt-1 p-3 pl-10 bg-gray-100 border border-gray-200 rounded-md" />
-                                {renderError('date')}
+                         <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="font-semibold text-sm">Location</label>
+                                <input name="location" {...formik.getFieldProps('location')} className="w-full mt-1 p-3 bg-gray-100 border border-gray-200 rounded-md" />
                             </div>
-                            <div className="relative">
+                            <div>
+                                <label className="font-semibold text-sm">Venue</label>
+                                <input name="venue" {...formik.getFieldProps('venue')} className="w-full mt-1 p-3 bg-gray-100 border border-gray-200 rounded-md" />
+                            </div>
+                        </div>
+                         <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="font-semibold text-sm">Date</label>
+                                <div className="relative mt-1">
+                                    <Calendar size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                                    <DatePicker selected={eventDate} onChange={(date) => setEventDate(date)} dateFormat="dd/MM/yyyy" placeholderText="Select date" className="w-full pl-10 pr-3 py-3 bg-gray-50 border border-gray-200 rounded-lg"/>
+                                </div>
+                            </div>
+                            <div>
                                 <label className="font-semibold text-sm">Time</label>
-                                <Clock size={18} className="absolute left-3 top-10 text-gray-400 pointer-events-none" />
-                                <input name="time" type="time" {...formik.getFieldProps('time')} className="w-full mt-1 p-3 pl-10 bg-gray-100 border border-gray-200 rounded-md" />
+                                <div className="relative mt-1">
+                                    <Clock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"/>
+                                    <DatePicker selected={eventTime} onChange={(time) => setEventTime(time)} showTimeSelect showTimeSelectOnly timeIntervals={15} timeCaption="Time" dateFormat="h:mm aa" placeholderText="Select time" className="w-full pl-10 pr-3 py-3 bg-gray-50 border border-gray-200 rounded-lg"/>
+                                </div>
                             </div>
                         </div>
                          <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <label className="font-semibold text-sm">Ticket Price (KES)</label>
-                                <input name="price" type="number" {...formik.getFieldProps('price')} placeholder="e.g., 1500" className="w-full mt-1 p-3 bg-gray-100 border border-gray-200 rounded-md" />
+                                <input name="price" type="number" {...formik.getFieldProps('price')} className="w-full mt-1 p-3 bg-gray-100 border border-gray-200 rounded-md" />
                                 {renderError('price')}
                             </div>
                             <div>
                                 <label className="font-semibold text-sm">Capacity</label>
-                                <input name="capacity" type="number" {...formik.getFieldProps('capacity')} placeholder="e.g., 200" className="w-full mt-1 p-3 bg-gray-100 border border-gray-200 rounded-md" />
-                                {renderError('capacity')}
+                                <input name="max_attendees" type="number" {...formik.getFieldProps('max_attendees')} className="w-full mt-1 p-3 bg-gray-100 border border-gray-200 rounded-md" />
+                                {renderError('max_attendees')}
                             </div>
                         </div>
                         <div className="pt-4 flex justify-end gap-2">
@@ -113,3 +159,4 @@ const EditEventModal = ({ isOpen, onClose, event }) => {
 };
 
 export default EditEventModal;
+

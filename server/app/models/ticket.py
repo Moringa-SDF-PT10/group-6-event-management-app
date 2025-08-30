@@ -1,19 +1,31 @@
-from sqlalchemy_serializer import SerializerMixin
 from app import db
+from datetime import datetime, timezone
 
-class Ticket(db.Model, SerializerMixin):
+class Ticket(db.Model):
     __tablename__ = 'tickets'
-    
-    serialize_rules = ('-user.password_hash', '-event.tickets')
 
     id = db.Column(db.Integer, primary_key=True)
-    ticket_type = db.Column(db.String(50), nullable=False, default='Regular')
-    purchase_date = db.Column(db.DateTime, server_default=db.func.now())
+    purchase_date = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    quantity = db.Column(db.Integer, nullable=False, default=1)
+    
+    # Foreign Keys
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     event_id = db.Column(db.Integer, db.ForeignKey('events.id'), nullable=False)
 
-    # Relationships are defined in other models via backref
-    user = db.relationship('User', backref=db.backref('tickets', lazy=True))
+    # Relationships
+    user = db.relationship('User', backref='tickets')
 
     def __repr__(self):
-        return f'<Ticket {self.ticket_type} for Event {self.event_id}>'
+        return f'<{self.quantity} Ticket(s) for Event ID {self.event_id} by User ID {self.user_id}>'
+
+    def to_dict(self, include_event=False):
+        data = {
+            'id': self.id,
+            'purchase_date': self.purchase_date.isoformat(),
+            'quantity': self.quantity,
+            'user_id': self.user_id,
+            'event_id': self.event_id
+        }
+        if include_event and self.event:
+            data['event'] = self.event.to_summary_dict()
+        return data

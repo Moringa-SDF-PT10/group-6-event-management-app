@@ -1,71 +1,114 @@
-from sqlalchemy.orm import validates
-from sqlalchemy_serializer import SerializerMixin
-from app import db
-from datetime import datetime
 
-class Event(db.Model, SerializerMixin):
+from datetime import datetime, timezone
+import re
+import uuid
+from flask import request
+from app import db
+from app.models.associations import event_categories
+from app.models.user import User
+from app.models.ticket import Ticket
+
+class Event(db.Model):
     __tablename__ = 'events'
-    
-    # Define serialization rules to include relationships
-    serialize_rules = ('-organizer.password_hash', '-tickets.user.password_hash', '-categories.events')
 
     id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(255), nullable=False)
-    description = db.Column(db.Text, nullable=False)
-    date = db.Column(db.DateTime, nullable=False)
-    location = db.Column(db.String(255), nullable=False)
-    price = db.Column(db.Float, nullable=False)
+    title = db.Column(db.String(200), nullable=False, index=True)
+    description = db.Column(db.Text, nullable=True)
+    short_description = db.Column(db.String(500), nullable=True)
+    date = db.Column(db.DateTime, nullable=False, index=True)
+    end_date = db.Column(db.DateTime, nullable=True)
+    location = db.Column(db.String(200), nullable=False)
+    venue = db.Column(db.String(200), nullable=True)
+    price = db.Column(db.Float, nullable=False, default=0.0)
+    currency = db.Column(db.String(3), nullable=False, default='KSH')
     image_url = db.Column(db.String(500), nullable=True)
-    organizer_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    created_at = db.Column(db.DateTime, server_default=db.func.now())
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    max_attendees = db.Column(db.Integer, nullable=True)
+    slug = db.Column(db.String(250), nullable=False, unique=True, index=True)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
+                           onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships
-    organizer = db.relationship('User', backref=db.backref('events', lazy=True))
-    tickets = db.relationship('Ticket', backref='event', lazy=True, cascade='all, delete-orphan')
-    categories = db.relationship('Category', secondary='event_categories', back_populates='events')
+    categories = db.relationship('Category', secondary=event_categories, back_populates='events')
+    organizer_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    organizer = db.relationship('User', backref='events')
+    tickets = db.relationship('Ticket', backref='event', cascade='all, delete-orphan')
 
-    @validates('price')
-    def validate_price(self, key, value):
-        if value < 0:
-            raise ValueError("Price cannot be negative")
-        return value
-
-    @validates('date')
-    def validate_date(self, key, value):
-        if isinstance(value, str):
-            # If string is passed, try to parse it
-            try:
-                value = datetime.fromisoformat(value.replace('Z', '+00:00'))
-            except ValueError:
-                raise ValueError("Invalid date format. Use ISO format.")
+    def __repr__(self):
+        return f'<Event {self.title}>'
         
-        if value < datetime.now():
-            raise ValueError("Event date cannot be in the past")
-        return value
 
-    def to_dict(self, include_organizer=True, include_categories=True):
-        
+    def _get_full_image_url(self):
+        if self.image_url and self.image_url.startswith('/uploads/'):
+            return f'{request.host_url.rstrip("/")}{self.image_url}'
+        return self.image_url
+
+
+    def to_dict(self, include_categories=True):
         data = {
             'id': self.id,
             'title': self.title,
             'description': self.description,
+            'short_description': self.short_description,
+            'date': self.date.isoformat() if self.date else None,
+            'end_date': self.end_date.isoformat() if self.end_date else None,
+            'location': self.location,
+            'venue': self.venue,
+            'price': self.price,
+            'currency': self.currency,
+            'image_url': self._get_full_image_url(), # Use the helper
+            'is_active': self.is_active,
+            'max_attendees': self.max_attendees,
+            'slug': self.slug,
+            'organizer_id': self.organizer_id,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+        if include_categories:
+            data['categories'] = [category.to_dict(include_events=False) for category in self.categories]
+        return data
+
+    def to_summary_dict(self):
+        return {
+            'id': self.id,
+            'title': self.title,
+            'short_description': self.short_description,
             'date': self.date.isoformat() if self.date else None,
             'location': self.location,
             'price': self.price,
-            'image_url': self.image_url,
-            'organizer_id': self.organizer_id,
-            'created_at': self.created_at.isoformat() if self.created_at else None
+            'currency': self.currency,
+            'image_url': self._get_full_image_url(),
+            'slug': self.slug,
+            'categories': [{'id': cat.id, 'name': cat.name, 'slug': cat.slug} for cat in self.categories]
         }
+
+    @property
+    def is_upcoming(self):
+        return self.date > datetime.now(timezone.utc) if self.date else False
+
+    @property
+    def formatted_price(self):
+        if self.price == 0:
+            return "Free"
+        return f"{self.currency} {self.price:,.0f}"
+
+    @staticmethod
+    def create_slug(title):
+        slug = re.sub(r'[^\w\s-]', '', title.lower()).strip()
+        slug = re.sub(r'\s+', '-', slug)
         
-        if include_organizer and self.organizer:
-            data['organizer'] = {
-                'id': self.organizer.id,
-                'username': self.organizer.username,
-                'first_name': self.organizer.first_name,
-                'last_name': self.organizer.last_name
-            }
-        
-        if include_categories:
-            data['categories'] = [{'id': cat.id, 'name': cat.name} for cat in self.categories]
+        if Event.query.filter_by(slug=slug).first():
+            unique_id = uuid.uuid4().hex[:6]
+            return f"{slug}-{unique_id}"
             
-        return data
+        return slug
+
+    @classmethod
+    def search_by_title(cls, search_term):
+        return cls.query.filter(cls.title.ilike(f'%{search_term}%'))
+
+    @classmethod
+    def filter_by_category(cls, category_name):
+        from app.models.category import Category
+        return cls.query.join(cls.categories).filter(Category.name.ilike(f'%{category_name}%'))

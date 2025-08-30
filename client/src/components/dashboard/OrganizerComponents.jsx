@@ -1,26 +1,58 @@
-import { useState } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Edit, Trash2, PlusCircle, ArrowUp, DollarSign, Ticket, Users } from 'lucide-react';
 import EditEventModal from './EditEventModal';
 import DeleteConfirmationModal from './DeleteConfirmationModal';
+import AuthContext from '../../context/AuthContext';
 
-// --- Mock Data ---
-const myEvents = [
-    { id: 1, title: 'My Awesome Tech Conference', date: '2025-10-15', time: '09:00', description: 'A conference about the future of tech.', status: 'Live', ticketsSold: 150, capacity: 200, price: 2500 },
-    { id: 2, title: 'Annual Charity Gala', date: '2025-11-22', time: '18:00', description: 'A gala to support local charities.', status: 'Upcoming', ticketsSold: 88, capacity: 100, price: 5000 },
-    { id: 3, title: 'Summer Music Fest', date: '2025-07-10', time: '12:00', description: 'Featuring the best local and international artists.', status: 'Completed', ticketsSold: 500, capacity: 500, price: 1500 },
-];
+//Main Layout Component
+export const OrganizerDashboardLayout = ({ onCreateEvent, refreshTrigger }) => {
+    const { token } = useContext(AuthContext);
+    const [myEvents, setMyEvents] = useState([]);
+    const [stats, setStats] = useState(null); // State for the stat card data
+    const [loading, setLoading] = useState(true);
 
-const analyticsData = [ { name: 'Tech Conf', sold: 150 }, { name: 'Charity Gala', sold: 88 }, { name: 'Music Fest', sold: 500 }];
-
-// --- Main Layout Component ---
-export const OrganizerDashboardLayout = ({ onCreateEvent }) => {
-    // --- State Management for Modals ---
     const [isEditModalOpen, setEditModalOpen] = useState(false);
     const [isDeleteModalOpen, setDeleteModalOpen] = useState(false);
     const [selectedEvent, setSelectedEvent] = useState(null);
 
-    // --- Handler Functions ---
+    // --- Data Fetching ---
+    const fetchDashboardData = async () => {
+        if (!token) return;
+        setLoading(true);
+        try {
+            // Fetchs both events and stats
+            const [eventsResponse, statsResponse] = await Promise.all([
+                fetch('http://127.0.0.1:5000/api/users/organizer/events', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                }),
+                fetch('http://127.0.0.1:5000/api/users/organizer/stats', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                })
+            ]);
+
+            const eventsData = await eventsResponse.json();
+            const statsData = await statsResponse.json();
+
+            if (eventsResponse.ok) setMyEvents(eventsData);
+            else throw new Error(eventsData.error || 'Failed to fetch events');
+            
+            if (statsResponse.ok) setStats(statsData);
+            else throw new Error(statsData.error || 'Failed to fetch stats');
+
+        } catch (error) {
+            console.error("Dashboard fetch error:", error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchDashboardData();
+    }, [token, refreshTrigger]);
+
+
+
     const handleEditClick = (event) => {
         setSelectedEvent(event);
         setEditModalOpen(true);
@@ -31,10 +63,20 @@ export const OrganizerDashboardLayout = ({ onCreateEvent }) => {
         setDeleteModalOpen(true);
     };
 
-    const handleConfirmDelete = () => {
-        alert(`Deleting event: ${selectedEvent.title}`); // Replace with API call
-        console.log('Deleting event ID:', selectedEvent.id);
-        closeModals();
+    const handleConfirmDelete = async () => {
+        if (!selectedEvent) return;
+        try {
+            const response = await fetch(`http://127.0.0.1:5000/api/events/${selectedEvent.id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!response.ok) throw new Error('Failed to delete event.');
+            fetchDashboardData();
+        } catch (error) {
+            alert(error.message);
+        } finally {
+            closeModals();
+        }
     };
     
     const closeModals = () => {
@@ -42,23 +84,14 @@ export const OrganizerDashboardLayout = ({ onCreateEvent }) => {
         setDeleteModalOpen(false);
         setSelectedEvent(null);
     };
+    
+    const analyticsData = myEvents.map(event => ({ name: event.title, sold: event.ticketsSold || 0 }));
 
     return (
         <>
-            {/* --- Modals --- */}
-            <EditEventModal 
-                isOpen={isEditModalOpen} 
-                onClose={closeModals} 
-                event={selectedEvent} 
-            />
-            <DeleteConfirmationModal 
-                isOpen={isDeleteModalOpen} 
-                onClose={closeModals} 
-                onConfirm={handleConfirmDelete}
-                eventName={selectedEvent?.title}
-            />
+            <EditEventModal isOpen={isEditModalOpen} onClose={closeModals} event={selectedEvent} onEventUpdated={fetchDashboardData}/>
+            <DeleteConfirmationModal isOpen={isDeleteModalOpen} onClose={closeModals} onConfirm={handleConfirmDelete} eventName={selectedEvent?.title}/>
 
-            {/* --- Dashboard Layout --- */}
             <div className="space-y-8">
                 <div className="flex justify-between items-center">
                     <div>
@@ -66,30 +99,32 @@ export const OrganizerDashboardLayout = ({ onCreateEvent }) => {
                         <p className="text-slate-light">Here's your event overview.</p>
                     </div>
                     <button onClick={onCreateEvent} className="flex items-center gap-2 bg-coral text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-opacity-90 transition-transform hover:scale-105">
-                        <PlusCircle size={20} />
-                        Create New Event
+                        <PlusCircle size={20} /> Create New Event
                     </button>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <StatCard icon={DollarSign} title="Total Revenue" value="KES 251,000" change="+12.5%" />
-                    <StatCard icon={Ticket} title="Tickets Sold (Month)" value="238" change="-2.1%" />
-                    <StatCard icon={Users} title="New Attendees" value="42" change="+5.5%" />
+                    {loading || !stats ? (
+                        <p>Loading stats...</p>
+                    ) : (
+                        <>
+                            <StatCard icon={DollarSign} title="Total Revenue" value={`KES ${stats.total_revenue.toLocaleString()}`} change="+12.5%" />
+                            <StatCard icon={Ticket} title="Tickets Sold (Month)" value={stats.tickets_this_month.toLocaleString()} change="-2.1%" />
+                            <StatCard icon={Users} title="New Attendees (30d)" value={stats.new_attendees} change="+5.5%" />
+                        </>
+                    )}
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     <div className="lg:col-span-2 bg-white p-6 rounded-xl border border-black/10 shadow-sm">
                         <h3 className="font-bold text-lg mb-4">My Events</h3>
-                        <div className="space-y-4">
-                            {myEvents.map(event => (
-                                <EventListItem 
-                                    key={event.id} 
-                                    event={event} 
-                                    onEdit={() => handleEditClick(event)}
-                                    onDelete={() => handleDeleteClick(event)}
-                                />
-                            ))}
-                        </div>
+                         {loading ? <p>Loading your events...</p> : (
+                            <div className="space-y-4">
+                                {myEvents.map(event => (
+                                    <EventListItem key={event.id} event={event} onEdit={() => handleEditClick(event)} onDelete={() => handleDeleteClick(event)}/>
+                                ))}
+                            </div>
+                         )}
                     </div>
                     <div className="bg-white p-6 rounded-xl border border-black/10 shadow-sm">
                         <h3 className="font-bold text-lg mb-4">Ticket Sales per Event</h3>
@@ -111,7 +146,7 @@ export const OrganizerDashboardLayout = ({ onCreateEvent }) => {
     );
 };
 
-// --- Child Components ---
+
 const StatCard = ({ icon: Icon, title, value, change }) => (
     <div className="bg-white p-6 rounded-xl border border-black/10 shadow-sm">
         <div className="flex items-center justify-center w-12 h-12 rounded-full bg-coral/10 mb-4">
@@ -132,12 +167,12 @@ const EventListItem = ({ event, onEdit, onDelete }) => (
         <div>
             <h4 className="font-bold text-charcoal">{event.title}</h4>
             <p className="text-sm text-slate-light">
-                {event.date} • {event.ticketsSold} / {event.capacity} tickets
+                {new Date(event.date).toLocaleDateString()} • {event.ticketsSold || 0} / {event.max_attendees || 'N/A'} tickets
             </p>
         </div>
         <div className="flex items-center gap-2 mt-4 md:mt-0">
-            <span className={`text-xs font-semibold px-2 py-1 rounded-full ${event.status === 'Live' ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'}`}>
-                {event.status}
+            <span className={`text-xs font-semibold px-2 py-1 rounded-full ${new Date(event.date) > new Date() ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'}`}>
+                {new Date(event.date) > new Date() ? 'Upcoming' : 'Past'}
             </span>
             <button onClick={onEdit} className="p-2 rounded-md hover:bg-blue-100 text-blue-500"><Edit size={18} /></button>
             <button onClick={onDelete} className="p-2 rounded-md hover:bg-red-100 text-red-500"><Trash2 size={18} /></button>

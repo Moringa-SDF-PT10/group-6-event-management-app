@@ -1,181 +1,157 @@
 from app import create_app, db
-from app.models import User, Event, Category, Ticket
+from app.models.event import Event
+from app.models.category import Category
+from app.models.user import User
 from datetime import datetime, timedelta
+import os
 
-def seed_data():
-    """Seeds the database with initial data."""
-    app = create_app()
+def clear_data():
+    """Drops all tables and recreates them."""
+    print("Clearing existing data...")
+    db.drop_all()
+    db.create_all()
+    print("✅ Database cleared and tables recreated")
+
+def create_users():
+    """Seeds the database with initial user data."""
+    print("👤 Creating users...")
+    
+    # Create an organizer user
+    organizer1 = User(
+        first_name='Kenya',
+        last_name='Events',
+        phone_number='123-456-7890',
+        username='KenyaEvents', 
+        email='contact@kenyaevents.co.ke', 
+        role='organizer'
+    )
+    organizer1.set_password('password123')
+
+    # Create an attendee user
+    attendee1 = User(
+        first_name='Test',
+        last_name='Attendee',
+        phone_number='098-765-4321',
+        username='TestAttendee', 
+        email='attendee@test.com', 
+        role='attendee'
+    )
+    attendee1.set_password('password123')
+
+    users = [organizer1, attendee1]
+    db.session.add_all(users)
+    db.session.commit()
+    
+    print(f"✅ Created {len(users)} users")
+    # Return the created users so we can reference them later
+    return users
+
+def create_categories():
+    """Seeds the database with event categories."""
+    print("📂 Creating categories...")
+    
+    categories_data = [
+        {'name': 'Music & Concerts', 'description': 'Live music performances, concerts, and music festivals', 'slug': 'music-concerts'},
+        {'name': 'Technology', 'description': 'Tech conferences, workshops, hackathons, and meetups', 'slug': 'technology'},
+        {'name': 'Sports & Fitness', 'description': 'Sporting events, tournaments, marathons, and fitness activities', 'slug': 'sports-fitness'},
+        {'name': 'Business & Networking', 'description': 'Business conferences, networking events, and entrepreneurship', 'slug': 'business-networking'},
+        {'name': 'Arts & Culture', 'description': 'Cultural festivals, art exhibitions, theater, and cultural events', 'slug': 'arts-culture'},
+        {'name': 'Food & Drink', 'description': 'Food festivals, wine tastings, and culinary experiences', 'slug': 'food-drink'},
+        {'name': 'Education & Workshops', 'description': 'Educational seminars, workshops, and training sessions', 'slug': 'education-workshops'},
+        {'name': 'Community & Social', 'description': 'Community gatherings, charity events, and social activities', 'slug': 'community-social'}
+    ]
+    
+    categories = {}
+    for cat_data in categories_data:
+        category = Category(**cat_data)
+        db.session.add(category)
+        categories[cat_data['slug']] = category
+    
+    db.session.commit()
+    print(f"✅ Created {len(categories_data)} categories")
+    return categories
+
+# --- This function now accepts an 'organizer' object ---
+def create_events(categories, organizer):
+    """Seeds the database with events and links them to an organizer."""
+    print("🎪 Creating events...")
+    
+    events_data = [
+        {
+            'title': 'Nairobi Tech Summit 2024',
+            'description': 'The largest technology conference in East Africa...',
+            'short_description': 'East Africa\'s largest tech conference...',
+            'date': datetime.now() + timedelta(days=30),
+            'end_date': datetime.now() + timedelta(days=32),
+            'location': 'Nairobi',
+            'venue': 'Kenyatta International Conference Centre',
+            'price': 15000.0,
+            'image_url': 'https://blog.busha.co/content/images/size/w2640/2022/04/africa-summit-nairobi.png',
+            'max_attendees': 5000,
+            'slug': 'nairobi-tech-summit-2024',
+            'categories': ['technology', 'business-networking']
+        },
+        {
+            'title': 'Safari Sevens Rugby Tournament',
+            'description': 'The premier international rugby sevens tournament in Kenya...',
+            'short_description': 'International rugby sevens tournament...',
+            'date': datetime.now() + timedelta(days=45),
+            'end_date': datetime.now() + timedelta(days=46),
+            'location': 'Nairobi',
+            'venue': 'RFUEA Ground',
+            'price': 2500.0,
+            'image_url': 'https://www.kru.co.ke/wp-content/uploads/2025/02/2025-Safari-7s-Official-Poster-scaled-e1738822485784.jpeg',
+            'max_attendees': 15000,
+            'slug': 'safari-sevens-rugby-2025',
+            'categories': ['sports-fitness', 'community-social']
+        },
+    ]
+    
+    events = []
+    for event_data in events_data:
+        category_slugs = event_data.pop('categories', [])
+        event_categories_obj = [categories[slug] for slug in category_slugs if slug in categories]
+        
+        event = Event(**event_data)
+        event.categories = event_categories_obj
+        # --- This is where the magic happens, just like your example ---
+        event.organizer = organizer
+        
+        db.session.add(event)
+        events.append(event)
+    
+    db.session.commit()
+    print(f"✅ Created {len(events_data)} events and linked to organizer '{organizer.username}'")
+    return events
+
+def seed_database():
+    """Main function to run all seeding operations."""
+    app = create_app('development')
+    
     with app.app_context():
-        # Clear existing data
-        print("Clearing existing data...")
-        Ticket.query.delete()
-        Event.query.delete()
-        Category.query.delete()
-        User.query.delete()
-        db.session.commit()
+        print("🌱 Starting database seeding...")
         
-        # Create users
-        organizer1 = User(
-            first_name='Kenya',
-            last_name='Events',
-            phone_number='123-456-7890',
-            username='KenyaEvents', 
-            email='contact@kenyaevents.co.ke', 
-            role='organizer'
-        )
-        organizer1.set_password('password123')
+        clear_data()
         
-        organizer2 = User(
-            first_name='Nairobi',
-            last_name='Entertainment',
-            phone_number='555-123-4567',
-            username='NairobiEntertainment', 
-            email='info@nrbentertainment.com', 
-            role='organizer'
-        )
-        organizer2.set_password('password123')
+        # --- Find the organizer user after creating them ---
+        users = create_users()
+        organizer_user = next((user for user in users if user.role == 'organizer'), None)
         
-        attendee1 = User(
-            first_name='Test',
-            last_name='Attendee',
-            phone_number='098-765-4321',
-            username='TestAttendee', 
-            email='attendee@test.com', 
-            role='attendee'
-        )
-        attendee1.set_password('password123')
-        
-        attendee2 = User(
-            first_name='Jane',
-            last_name='Doe',
-            phone_number='111-222-3333',
-            username='JaneDoe', 
-            email='jane@example.com', 
-            role='attendee'
-        )
-        attendee2.set_password('password123')
+        categories = create_categories()
 
-        db.session.add_all([organizer1, organizer2, attendee1, attendee2])
-        db.session.commit()
+        # --- Pass the organizer to the create_events function ---
+        if organizer_user:
+            events = create_events(categories, organizer_user)
+        else:
+            print("⚠️ Could not find an organizer user to link events to.")
+            events = []
         
-        # Create categories
-        categories_data = [
-            'Music', 'Technology', 'Business', 'Arts', 'Sports', 
-            'Food & Drink', 'Education', 'Health', 'Fashion', 'Travel'
-        ]
-        
-        categories = []
-        for cat_name in categories_data:
-            category = Category(name=cat_name)
-            categories.append(category)
-            db.session.add(category)
-        
-        db.session.commit()
-        
-        # Create events
-        events_data = [
-            {
-                'title': 'Nairobi Tech Conference 2025',
-                'description': 'Join us for the biggest tech conference in East Africa. Learn about the latest trends in AI, blockchain, and mobile development.',
-                'date': datetime.now() + timedelta(days=30),
-                'location': 'KICC, Nairobi',
-                'price': 5000.0,
-                'image_url': 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800',
-                'organizer': organizer1,
-                'categories': [categories[1], categories[6]]  # Technology, Education
-            },
-            {
-                'title': 'Safaricom Jazz Festival',
-                'description': 'Experience the best of local and international jazz artists in an unforgettable evening of music.',
-                'date': datetime.now() + timedelta(days=45),
-                'location': 'Carnivore Grounds, Nairobi',
-                'price': 3000.0,
-                'image_url': 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=800',
-                'organizer': organizer2,
-                'categories': [categories[0]]  # Music
-            },
-            {
-                'title': 'Startup Pitch Competition',
-                'description': 'Watch innovative startups pitch their ideas to top investors. Network with entrepreneurs and venture capitalists.',
-                'date': datetime.now() + timedelta(days=20),
-                'location': 'iHub, Nairobi',
-                'price': 1500.0,
-                'image_url': 'https://images.unsplash.com/photo-1559136555-9303baea8ebd?w=800',
-                'organizer': organizer1,
-                'categories': [categories[2], categories[1]]  # Business, Technology
-            },
-            {
-                'title': 'Nairobi Food & Wine Festival',
-                'description': 'Celebrate the flavors of Kenya with top chefs, local farmers, and wine makers from around the world.',
-                'date': datetime.now() + timedelta(days=60),
-                'location': 'Uhuru Gardens, Nairobi',
-                'price': 2500.0,
-                'image_url': 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800',
-                'organizer': organizer2,
-                'categories': [categories[5]]  # Food & Drink
-            },
-            {
-                'title': 'Digital Marketing Masterclass',
-                'description': 'Learn from industry experts about social media marketing, SEO, and digital advertising strategies.',
-                'date': datetime.now() + timedelta(days=15),
-                'location': 'Strathmore University, Nairobi',
-                'price': 4000.0,
-                'image_url': 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800',
-                'organizer': organizer1,
-                'categories': [categories[2], categories[6]]  # Business, Education
-            },
-            {
-                'title': 'Nairobi Art Gallery Opening',
-                'description': 'Discover contemporary African art at the opening of our new gallery featuring local and international artists.',
-                'date': datetime.now() + timedelta(days=10),
-                'location': 'Nairobi National Museum',
-                'price': 1000.0,
-                'image_url': 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=800',
-                'organizer': organizer2,
-                'categories': [categories[3]]  # Arts
-            }
-        ]
-        
-        events = []
-        for event_data in events_data:
-            event = Event(
-                title=event_data['title'],
-                description=event_data['description'],
-                date=event_data['date'],
-                location=event_data['location'],
-                price=event_data['price'],
-                image_url=event_data['image_url'],
-                organizer_id=event_data['organizer'].id
-            )
-            event.categories = event_data['categories']
-            events.append(event)
-            db.session.add(event)
-        
-        db.session.commit()
-        
-        # Create some sample tickets
-        tickets_data = [
-            {'user': attendee1, 'event': events[0], 'ticket_type': 'Regular'},
-            {'user': attendee1, 'event': events[1], 'ticket_type': 'VIP'},
-            {'user': attendee2, 'event': events[2], 'ticket_type': 'Regular'},
-            {'user': attendee2, 'event': events[5], 'ticket_type': 'Regular'},
-        ]
-        
-        for ticket_data in tickets_data:
-            ticket = Ticket(
-                user_id=ticket_data['user'].id,
-                event_id=ticket_data['event'].id,
-                ticket_type=ticket_data['ticket_type']
-            )
-            db.session.add(ticket)
-        
-        db.session.commit()
-        
-        print("Database seeded successfully! 🌱")
-        print(f"Created {len([organizer1, organizer2, attendee1, attendee2])} users")
-        print(f"Created {len(categories)} categories")
-        print(f"Created {len(events)} events")
-        print(f"Created {len(tickets_data)} tickets")
+        print(f"\n🎉 Seeding completed successfully!")
+        print(f"📊 Summary:")
+        print(f"   • Users: {len(users)}")
+        print(f"   • Categories: {len(categories)}")
+        print(f"   • Events: {len(events)}")
+        print(f"   • Database: {app.config['SQLALCHEMY_DATABASE_URI']}")
 
 if __name__ == '__main__':
-    seed_data()
+    seed_database()

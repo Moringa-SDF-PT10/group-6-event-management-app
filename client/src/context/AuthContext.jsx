@@ -7,7 +7,7 @@ export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [token, setToken] = useState(() => localStorage.getItem('token') || null);
     const navigate = useNavigate();
-    const API_URL = 'http://127.0.0.1:5000';
+    const API_URL = 'http://127.0.0.1:5000/api';
 
     useEffect(() => {
         if (token) {
@@ -36,7 +36,7 @@ export const AuthProvider = ({ children }) => {
             if (response.ok) {
                 setToken(data.access_token);
                 setUser(data.user);
-                navigate('/dashboard'); 
+                navigate('/dashboard');
             } else {
                 console.error(data.error);
             }
