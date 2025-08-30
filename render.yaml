@@ -5,7 +5,6 @@ services:
     plan: free
     postgresMajorVersion: 14
 
-
   - type: web
     name: event-horizon-api
     env: python
@@ -28,10 +27,9 @@ services:
       - key: FLASK_APP
         value: wsgi.py
 
-
   - type: web
     name: event-horizon-client
-    runtime: static
+    env: static
     region: oregon
     plan: free
     rootDir: client
@@ -43,9 +41,7 @@ services:
           type: web
           name: event-horizon-api
           property: url
-
     routes:
       - type: rewrite
         source: /*
         destination: /index.html
-
