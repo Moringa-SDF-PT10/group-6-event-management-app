@@ -29,7 +29,7 @@ services:
         value: wsgi.py
 
   # 3. React Frontend
-  - type: static
+  - type: static_site
     name: event-horizon-client
     env: static
     region: oregon
