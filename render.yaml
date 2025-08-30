@@ -1,10 +1,9 @@
 services:
   - type: pserv
     name: event-horizon-db
-    region: oregon 
+    region: oregon
     plan: free
     postgresMajorVersion: 14
-
 
   - type: web
     name: event-horizon-api
@@ -28,15 +27,12 @@ services:
       - key: FLASK_APP
         value: wsgi.py
 
-  # 3. React Frontend
-  - type: static_site
+  - type: web
     name: event-horizon-client
-    env: static
-    region: oregon
-    plan: free
-    rootDir: client 
+    runtime: static
+    rootDir: client
     buildCommand: "npm install && npm run build"
-    publishPath: "dist"
+    publishPath: dist
     envVars:
       - key: VITE_API_URL
         fromService:
