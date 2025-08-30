@@ -4,14 +4,18 @@ from datetime import timedelta
 
 load_dotenv()
 
+
 class Config:
     # Base directory
     BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
     UPLOAD_FOLDER = os.path.join(BASE_DIR, '..', 'uploads')
 
-    # Database URI
-    SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL") or (
+    uri = os.environ.get("DATABASE_URL")
+    if uri and uri.startswith("postgres://"):
+        uri = uri.replace("postgres://", "postgresql://", 1)
+
+    SQLALCHEMY_DATABASE_URI = uri or (
         "sqlite:///" + os.path.join(BASE_DIR, "..", "instance", "app.db")
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
@@ -46,11 +50,10 @@ class TestConfig(Config):
     JWT_SECRET_KEY = "test-jwt-secret-key"
 
 
-# Dictionary for factory pattern
+
 config = {
     "development": DevelopmentConfig,
     "production": ProductionConfig,
     "testing": TestConfig,
     "default": DevelopmentConfig,
 }
-
