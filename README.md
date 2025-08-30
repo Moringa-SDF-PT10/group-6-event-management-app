@@ -166,11 +166,9 @@ client/
 
 ### 🚀 Live Application
 
-- Application URl 
+**[Event Horizons](https://group-6-event-management-app-tfpl.onrender.com/)** 
 
 ## 🚀 Getting Started
-
-**[Event Horizons](https://group-6-event-management-app-tfpl.onrender.com/)**
 
 ### 📋 Prerequisites
 - 🐍 Python 3.8+
