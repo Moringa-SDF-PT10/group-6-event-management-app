@@ -24,8 +24,9 @@ dist-ssr
 *.sw?
 venv/
 
-# Ignore environment files
 *.en
-
-# Ignore virtual environment folder
 new_env_3_12/
+
+
+backend/
+frontend/

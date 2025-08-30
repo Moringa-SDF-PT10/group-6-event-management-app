@@ -16,7 +16,8 @@ const EventDetailPage = () => {
     useEffect(() => {
         const fetchEvent = async () => {
             try {
-                const response = await fetch(`http://127.0.0.1:5000/api/events/slug/${slug}`);
+                // UPDATED: Changed to a relative path
+                const response = await fetch(`/api/events/slug/${slug}`);
                 if (!response.ok) {
                     throw new Error('Event not found');
                 }

@@ -23,10 +23,12 @@ export const OrganizerDashboardLayout = ({ onCreateEvent, refreshTrigger }) => {
         try {
             // Fetchs both events and stats
             const [eventsResponse, statsResponse] = await Promise.all([
-                fetch('http://127.0.0.1:5000/api/users/organizer/events', {
+                // UPDATED: Changed to a relative path
+                fetch('/api/users/organizer/events', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 }),
-                fetch('http://127.0.0.1:5000/api/users/organizer/stats', {
+                // UPDATED: Changed to a relative path
+                fetch('/api/users/organizer/stats', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 })
             ]);
@@ -66,7 +68,8 @@ export const OrganizerDashboardLayout = ({ onCreateEvent, refreshTrigger }) => {
     const handleConfirmDelete = async () => {
         if (!selectedEvent) return;
         try {
-            const response = await fetch(`http://127.0.0.1:5000/api/events/${selectedEvent.id}`, {
+            // UPDATED: Changed to a relative path
+            const response = await fetch(`/api/events/${selectedEvent.id}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
             });

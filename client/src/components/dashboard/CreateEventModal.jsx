@@ -71,7 +71,8 @@ const CreateEventModal = ({ isOpen, onClose, onEventCreated }) => {
     }
     
     try {
-      const response = await fetch("http://127.0.0.1:5000/api/events/", {
+      // UPDATED: Changed to a relative path
+      const response = await fetch("/api/events/", {
         method: "POST",
         headers: { "Authorization": `Bearer ${token}` },
         body: dataToSend,
@@ -203,4 +204,3 @@ const CreateEventModal = ({ isOpen, onClose, onEventCreated }) => {
 };
 
 export default CreateEventModal;
-

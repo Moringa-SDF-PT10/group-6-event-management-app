@@ -7,7 +7,8 @@ export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [token, setToken] = useState(() => localStorage.getItem('token') || null);
     const navigate = useNavigate();
-    const API_URL = 'http://127.0.0.1:5000/api';
+    // UPDATED: Changed to a relative path for production
+    const API_URL = '/api';
 
     useEffect(() => {
         if (token) {
