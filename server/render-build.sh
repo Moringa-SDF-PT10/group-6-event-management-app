@@ -4,6 +4,7 @@ set -o errexit
 
 echo "Building the project..."
 
+
 pip install -r requirements.txt
 
 
@@ -16,6 +17,7 @@ export FLASK_APP="app:create_app()"
 
 echo "Running database migrations..."
 flask db upgrade
+
 
 echo "Seeding the database..."
 python app/seed.py
