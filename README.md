@@ -6,6 +6,8 @@ A full-stack event management and ticketing platform built with Flask (backend) 
 
 ### 🔎 Preview  
 
+Please Click on an image to be redirected to the Render Deployeed website!
+
 <p align="center">
   <a href="https://group-6-event-management-app-tfpl.onrender.com/">
     <img src="./client/public/Screenshot (53).png" alt="Homepage Preview" width="80%"/>
